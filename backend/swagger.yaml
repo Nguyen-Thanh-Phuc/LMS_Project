@@ -1,0 +1,870 @@
+openapi: 3.0.1
+info:
+  title: Mini LMS API
+  version: "1.0.0"
+  description: |
+    RESTful API for the Mini Learning Management System platform.  
+    Includes authentication, courses, enrollments, quizzes, attempts, certificates, and admin dashboard endpoints.
+servers:
+  - url: http://localhost:5000/api
+    description: Local development server
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    User:
+      type: object
+      properties:
+        _id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [user, admin, staff]
+    Course:
+      type: object
+      properties:
+        _id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        thumbnail:
+          type: string
+        price:
+          type: number
+        instructor:
+          $ref: '#/components/schemas/User'
+        studentsEnrolled:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+    Enrollment:
+      type: object
+      properties:
+        _id:
+          type: string
+        userId:
+          $ref: '#/components/schemas/User'
+        courseId:
+          $ref: '#/components/schemas/Course'
+        progress:
+          type: number
+        completedLessons:
+          type: array
+          items:
+            type: string
+    Quiz:
+      type: object
+      properties:
+        _id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        courseId:
+          $ref: '#/components/schemas/Course'
+        questions:
+          type: array
+          items:
+            type: object
+            properties:
+              text:
+                type: string
+              options:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    text:
+                      type: string
+                    isCorrect:
+                      type: boolean
+        passingScore:
+          type: number
+        totalQuestions:
+          type: number
+    Attempt:
+      type: object
+      properties:
+        _id:
+          type: string
+        userId:
+          $ref: '#/components/schemas/User'
+        quizId:
+          $ref: '#/components/schemas/Quiz'
+        score:
+          type: number
+        percentage:
+          type: number
+        passed:
+          type: boolean
+    Certificate:
+      type: object
+      properties:
+        _id:
+          type: string
+        userId:
+          $ref: '#/components/schemas/User'
+        courseId:
+          $ref: '#/components/schemas/Course'
+        certificateId:
+          type: string
+        issueDate:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [issued, revoked]
+security:
+  - bearerAuth: []
+paths:
+  /auth/register:
+    post:
+      tags: [Authentication]
+      summary: Register new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+                password:
+                  type: string
+            required: [name, email, password]
+      responses:
+        '201':
+          description: User registered
+        '400':
+          description: Validation error or user exists
+  /auth/login:
+    post:
+      tags: [Authentication]
+      summary: Login user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                password:
+                  type: string
+            required: [email, password]
+      responses:
+        '200':
+          description: Returns accessToken, refreshToken, user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken:
+                    type: string
+                  refreshToken:
+                    type: string
+                  user:
+                    $ref: '#/components/schemas/User'
+        '400':
+          description: Invalid credentials
+  /auth/refresh-token:
+    post:
+      tags: [Authentication]
+      summary: Refresh access token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                requestToken:
+                  type: string
+            required: [requestToken]
+      responses:
+        '200':
+          description: New access token
+        '403':
+          description: Invalid or expired refresh token
+  /auth/logout:
+    post:
+      tags: [Authentication]
+      summary: Logout user and invalidate refresh token
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Logged out
+  /auth/forgot-password:
+    post:
+      tags: [Authentication]
+      summary: Send password reset email
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+            required: [email]
+      responses:
+        '200':
+          description: Email sent
+  /auth/reset-password:
+    post:
+      tags: [Authentication]
+      summary: Reset password using token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token:
+                  type: string
+                newPassword:
+                  type: string
+            required: [token, newPassword]
+      responses:
+        '200':
+          description: Password updated
+  /courses:
+    get:
+      tags: [Courses]
+      summary: Get all courses
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+        - in: query
+          name: sort
+          schema:
+            type: string
+        - in: query
+          name: search
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of courses
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Course'
+                  pagination:
+                    type: object
+    post:
+      tags: [Courses]
+      summary: Create a new course
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                price:
+                  type: number
+                thumbnail:
+                  type: string
+                  format: binary
+            required: [title, description]
+      responses:
+        '201':
+          description: Course created
+  /courses/{courseId}:
+    get:
+      tags: [Courses]
+      summary: Get course by ID
+      parameters:
+        - in: path
+          name: courseId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Course detail
+        '404':
+          description: Course not found
+    put:
+      tags: [Courses]
+      summary: Update course
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: courseId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                price:
+                  type: number
+                thumbnail:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Course updated
+    delete:
+      tags: [Courses]
+      summary: Delete course
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: courseId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Deleted
+  /courses/{courseId}/stats:
+    get:
+      tags: [Courses]
+      summary: Get course statistics
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: courseId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Stats object
+  /enrollments/enroll:
+    post:
+      tags: [Enrollments]
+      summary: Enroll in a course
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                courseId:
+                  type: string
+            required: [courseId]
+      responses:
+        '201':
+          description: Enrollment created
+  /enrollments/my-enrollments:
+    get:
+      tags: [Enrollments]
+      summary: Get enrollments for authenticated user
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of enrollments
+  /enrollments/{id}/progress:
+    put:
+      tags: [Enrollments]
+      summary: Update enrollment progress
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                progress:
+                  type: number
+            required: [progress]
+      responses:
+        '200':
+          description: Updated enrollment
+  /enrollments/{id}/mark-complete:
+    put:
+      tags: [Enrollments]
+      summary: Mark lesson as completed
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                lessonId:
+                  type: string
+            required: [lessonId]
+      responses:
+        '200':
+          description: Lesson marked complete
+  /enrollments/{id}:
+    delete:
+      tags: [Enrollments]
+      summary: Unenroll from course
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Enrollment deleted
+  /enrollments/stats:
+    get:
+      tags: [Enrollments]
+      summary: Enrollment statistics (admin)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Stats object
+  /quizzes:
+    get:
+      tags: [Quizzes]
+      summary: Get all quizzes
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+        - in: query
+          name: sort
+          schema:
+            type: string
+        - in: query
+          name: courseId
+          schema:
+            type: string
+        - in: query
+          name: search
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of quizzes
+    post:
+      tags: [Quizzes]
+      summary: Create quiz (admin)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                courseId:
+                  type: string
+                createdBy:
+                  type: string
+                questions:
+                  type: array
+                  items:
+                    type: object
+                passingScore:
+                  type: number
+              required: [title, courseId, createdBy, questions]
+      responses:
+        '201':
+          description: Quiz created
+  /quizzes/{quizId}:
+    get:
+      tags: [Quizzes]
+      summary: Get quiz by ID
+      parameters:
+        - in: path
+          name: quizId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: includeAnswers
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Quiz object
+    put:
+      tags: [Quizzes]
+      summary: Update quiz
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: quizId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Updated quiz
+  /attempts:
+    post:
+      tags: [Attempts]
+      summary: Submit quiz attempt
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: string
+                quizId:
+                  type: string
+                courseId:
+                  type: string
+                answers:
+                  type: array
+                  items:
+                    type: string
+              required: [userId, quizId, courseId, answers]
+      responses:
+        '201':
+          description: Attempt created and graded
+  /attempts/user/{userId}:
+    get:
+      tags: [Attempts]
+      summary: Get attempts by user
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: page
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+        - in: query
+          name: quizId
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of attempts
+  /attempts/quiz/{quizId}/stats:
+    get:
+      tags: [Attempts]
+      summary: Quiz statistics
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: quizId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Stats
+  /attempts/{id}:
+    get:
+      tags: [Attempts]
+      summary: Get attempt by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Attempt object
+  /certificates:
+    get:
+      tags: [Certificates]
+      summary: Get certificates (list)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+        - in: query
+          name: status
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of certificates
+  /admin/dashboard/overview:
+    get:
+      tags: [Admin]
+      summary: Dashboard overview
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Overview stats
+  /admin/dashboard/analytics:
+    get:
+      tags: [Admin]
+      summary: Analytics data
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Analytics object
+  /admin/courses:
+    get:
+      tags: [Admin]
+      summary: List courses with admin stats
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+        - in: query
+          name: search
+          schema:
+            type: string
+        - in: query
+          name: sort
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Admin course list
+  /admin/students:
+    get:
+      tags: [Admin]
+      summary: List students
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+        - in: query
+          name: search
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Student list
+  /admin/enrollments:
+    get:
+      tags: [Admin]
+      summary: List enrollments
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+        - in: query
+          name: status
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Enrollment list
+  /admin/quizzes:
+    get:
+      tags: [Admin]
+      summary: List quizzes with stats
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Quiz list
+  /admin/attempts:
+    get:
+      tags: [Admin]
+      summary: List attempts
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+        - in: query
+          name: status
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Attempt list
+  /admin/certificates:
+    get:
+      tags: [Admin]
+      summary: List certificates
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+        - in: query
+          name: status
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Certificate list
+  /admin/courses/{courseId}/stats:
+    get:
+      tags: [Admin]
+      summary: Course detailed stats
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: courseId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Stats object
+  /admin/students/{userId}/stats:
+    get:
+      tags: [Admin]
+      summary: Student detailed stats
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Stats object
