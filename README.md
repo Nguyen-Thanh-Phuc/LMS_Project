@@ -204,7 +204,17 @@ For complete API documentation, refer to `ADMIN_ENDPOINTS.md` in the backend fol
 
 ## 📊 User Roles
 
-- **Student**: Can enroll in courses, take quizzes, and view progress
+- **Student**:
+Enroll in courses
+View course details
+Take quizzes
+Submit quiz answers
+View quiz results (score and pass/fail)
+Track learning progress
+View quiz history
+Retake quizzes
+Receive certificates after completing courses
+Login and logout account
 - **Instructor**: Can create courses and quizzes, manage students
 - **Admin**: Full system management and monitoring
 
