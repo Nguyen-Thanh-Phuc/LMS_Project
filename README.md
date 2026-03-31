@@ -234,11 +234,16 @@ The system sends emails for:
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-## 👤 Author
+## � Authors
 
 **Nguyen Thanh Phuc**
-
 - GitHub: [@Nguyen-Thanh-Phuc](https://github.com/Nguyen-Thanh-Phuc)
+
+**VDLuong3001**
+- GitHub: [@VDLuong3001](https://github.com/VDLuong3001)
+
+**HoangVuong484**
+- GitHub: [@HoangVuong484](https://github.com/HoangVuong484)
 
 ## 📞 Support & Questions
 
